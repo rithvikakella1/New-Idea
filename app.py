@@ -45,12 +45,11 @@ def extract_medical_codes(note: str) -> str:
 
     client = OpenAI()  # uses OPENAI_API_KEY from env
     response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are a helpful medical coding assistant."},
-            {"role": "user", "content": full_prompt}
-        ],
-        temperature=0.2
+    model="gpt-3.5-turbo",  # Change from "gpt-4"
+    messages=[...],
+    temperature=0.2
+)
+
     )
     return response.choices[0].message.content
 
