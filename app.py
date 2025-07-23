@@ -1,5 +1,5 @@
 import os
-import openai
+From openai import OpenAI
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
