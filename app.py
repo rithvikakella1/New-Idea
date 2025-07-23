@@ -24,8 +24,9 @@ class NoteInput(BaseModel):
 
 # Prompt template
 prompt_template = """
-You are a medical coding assistant. Given a clinical note, extract relevant ICD-10 and CPT codes.
-Respond in JSON with the following format:
+You are a professional medical coder. Given a clinical note, extract **all possible** relevant ICD-10 diagnosis codes and CPT procedure codes. Include codes for symptoms, comorbidities, tests, and treatments, not just the primary diagnosis.
+
+Respond in this JSON format:
 [
   {
     "type": "Diagnosis" or "Procedure",
@@ -35,6 +36,7 @@ Respond in JSON with the following format:
     "reasoning": "<short justification>"
   }
 ]
+
 
 Clinical Note:
 """
@@ -47,7 +49,8 @@ def extract_medical_codes(note: str) -> str:
     response = client.chat.completions.create(
     model="gpt-3.5-turbo",
     messages=[
-        {"role": "system", "content": "You are a helpful medical coding assistant."},
+        {"role": "system", "content": "You are a thorough and accurate medical coding assistant. Include all diagnoses (including comorbidities and risk factors), procedures (including lab tests and imaging), and explain each with short reasoning."
+},
         {"role": "user", "content": full_prompt}
     ],
     temperature=0.2
