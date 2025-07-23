@@ -48,7 +48,6 @@ def extract_medical_codes(note: str) -> str:
     model="gpt-3.5-turbo",  # Change from "gpt-4"
     messages=[...],
     temperature=0.2
-)
 
     )
     return response.choices[0].message.content
