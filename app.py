@@ -67,3 +67,23 @@ app = FastAPI()
 def read_root():
     return {"message": "Hello from New Idea!"}
 
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
+import openai
+
+app = FastAPI()
+
+class NoteInput(BaseModel):
+    note: str
+
+@app.post("/api/extract")
+async def extract_codes(data: NoteInput):
+    # Dummy response for now
+    return {
+        "codes": [
+            {"type": "ICD-10", "code": "J20.9", "description": "Acute bronchitis"},
+            {"type": "CPT", "code": "99213", "description": "Office visit"}
+        ]
+    }
+
+
