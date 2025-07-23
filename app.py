@@ -1,13 +1,26 @@
 import os
 import openai
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# Load API key from environment variable
+# Load OpenAI key from environment
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Request model
+class NoteInput(BaseModel):
+    note: str
 
 # Prompt template
 prompt_template = """
@@ -26,64 +39,31 @@ Respond in JSON with the following format:
 Clinical Note:
 """
 
-# Core function
-def extract_medical_codes(note):
+# Core logic
+def extract_medical_codes(note: str) -> str:
     full_prompt = prompt_template + note.strip()
     response = openai.ChatCompletion.create(
-        model="gpt-4",  # Or "gpt-4o" if you have access
+        model="gpt-4",  # or "gpt-4o"
         messages=[
             {"role": "system", "content": "You are a helpful medical coding assistant."},
             {"role": "user", "content": full_prompt}
         ],
         temperature=0.2
     )
-    reply = response.choices[0].message.content
-    return reply
+    return response.choices[0].message.content
 
-# API route
-@app.route("/api/extract", methods=["POST"])
-def api_extract():
-    data = request.get_json()
-    note = data.get("note", "")
-    if not note:
-        return jsonify({"error": "No clinical note provided"}), 400
-    try:
-        codes = extract_medical_codes(note)
-        return jsonify({"result": codes})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Use Waitress for production
-if __name__ == "__main__":
-    from waitress import serve
-    port = int(os.environ.get("PORT", 10000))
-    serve(app, host="0.0.0.0", port=port)
-
-from fastapi import FastAPI
-
-app = FastAPI()
-
+# Root health check
 @app.get("/")
-def read_root():
+def root():
     return {"message": "Hello from New Idea!"}
 
-from fastapi import FastAPI, Request
-from pydantic import BaseModel
-import openai
-
-app = FastAPI()
-
-class NoteInput(BaseModel):
-    note: str
-
+# Main endpoint
 @app.post("/api/extract")
-async def extract_codes(data: NoteInput):
-    # Dummy response for now
-    return {
-        "codes": [
-            {"type": "ICD-10", "code": "J20.9", "description": "Acute bronchitis"},
-            {"type": "CPT", "code": "99213", "description": "Office visit"}
-        ]
-    }
-
-
+def api_extract(input: NoteInput):
+    if not input.note.strip():
+        raise HTTPException(status_code=400, detail="No clinical note provided.")
+    try:
+        result = extract_medical_codes(input.note)
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
