@@ -6,11 +6,15 @@ from pydantic import BaseModel
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+app = FastAPI()  
+
+# Serve static files from a folder if you have CSS/JS/etc.
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Serve the landing page
 @app.get("/", response_class=HTMLResponse)
-async def landing():
-    with open("landing.html", "r") as f:
+async def serve_landing():
+    with open("landing.html", "r", encoding="utf-8") as f:
         return f.read()
 
 # Load OpenAI key from environment
