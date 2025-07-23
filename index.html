@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Medical Code Extractor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      font-size: 1em;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Medical Code Extractor</h2>
+  <textarea id="noteInput" rows="6" placeholder="Enter clinical note..."></textarea><br>
+  <button onclick="sendNote()">Submit</button>
+
+  <div id="output"></div>
+
+  <script>
+    function sendNote() {
+      const note = document.getElementById("noteInput").value;
+      const output = document.getElementById("output");
+      output.innerHTML = "Loading...";
+
+      fetch("https://new-idea-ry0n.onrender.com/api/extract", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ note: note })
+      })
+        .then(response => response.json())
+        .then(data => {
+          let result = data.result || JSON.stringify(data, null, 2);
+
+          // Strip markdown JSON formatting
+          result = result.replace(/```json|```/g, '').trim();
+
+          try {
+            const parsed = JSON.parse(result);
+            output.innerHTML = formatTable(parsed);
+          } catch (e) {
+            output.innerHTML = `<pre>${result}</pre>`;
+          }
+        })
+        .catch(error => {
+          output.textContent = "Error: " + error.message;
+        });
+    }
+
+    function formatTable(codes) {
+      if (!Array.isArray(codes)) return "Unexpected response format.";
+
+      let table = `
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Code Type</th>
+              <th>Code</th>
+              <th>Description</th>
+              <th>Reasoning</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      for (const code of codes) {
+        table += `
+          <tr>
+            <td>${code.type}</td>
+            <td>${code.code_type}</td>
+            <td>${code.code}</td>
+            <td>${code.description}</td>
+            <td>${code.reasoning}</td>
+          </tr>
+        `;
+      }
+
+      table += `</tbody></table>`;
+      return table;
+    }
+  </script>
+
+</body>
+</html>
