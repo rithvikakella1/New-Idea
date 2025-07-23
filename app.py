@@ -42,8 +42,10 @@ Clinical Note:
 # Core logic
 def extract_medical_codes(note: str) -> str:
     full_prompt = prompt_template + note.strip()
-    response = openai.ChatCompletion.create(
-        model="gpt-4",  # or "gpt-4o"
+
+    client = OpenAI()  # uses OPENAI_API_KEY from env
+    response = client.chat.completions.create(
+        model="gpt-4",
         messages=[
             {"role": "system", "content": "You are a helpful medical coding assistant."},
             {"role": "user", "content": full_prompt}
@@ -51,6 +53,8 @@ def extract_medical_codes(note: str) -> str:
         temperature=0.2
     )
     return response.choices[0].message.content
+
+
 
 # Root health check
 @app.get("/")
