@@ -3,6 +3,15 @@ from openai import OpenAI
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/", response_class=HTMLResponse)
+async def landing():
+    with open("landing.html", "r") as f:
+        return f.read()
 
 # Load OpenAI key from environment
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
