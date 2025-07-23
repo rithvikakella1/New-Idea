@@ -5,38 +5,80 @@
   <title>Medical Code Extractor</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 800px;
-      margin: auto;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 40px;
+      color: #333;
+    }
+
+    h2 {
+      text-align: center;
+      color: #444;
     }
 
     textarea {
       width: 100%;
-      padding: 10px;
-      font-size: 1em;
+      padding: 12px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+      resize: vertical;
     }
 
     button {
       margin-top: 10px;
       padding: 10px 20px;
-      font-size: 1em;
+      font-size: 1rem;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #output {
+      margin-top: 30px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
+      background-color: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
     }
 
     th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
+      padding: 12px 15px;
+      border-bottom: 1px solid #eee;
       text-align: left;
     }
 
     th {
-      background-color: #f0f0f0;
+      background-color: #f2f2f2;
+      color: #333;
+      font-weight: bold;
+    }
+
+    tr:hover {
+      background-color: #fafafa;
+    }
+
+    .loading {
+      font-style: italic;
+      color: #666;
+    }
+
+    .error {
+      color: red;
     }
   </style>
 </head>
@@ -52,7 +94,7 @@
     function sendNote() {
       const note = document.getElementById("noteInput").value;
       const output = document.getElementById("output");
-      output.innerHTML = "Loading...";
+      output.innerHTML = "<p class='loading'>Processing...</p>";
 
       fetch("https://new-idea-ry0n.onrender.com/api/extract", {
         method: "POST",
@@ -64,19 +106,17 @@
         .then(response => response.json())
         .then(data => {
           let result = data.result || JSON.stringify(data, null, 2);
-
-          // Strip markdown JSON formatting
           result = result.replace(/```json|```/g, '').trim();
 
           try {
             const parsed = JSON.parse(result);
-            output.innerHTML = formatTable(parsed);
+            output.innerHTML = "<h3>Extracted Medical Codes:</h3>" + formatTable(parsed);
           } catch (e) {
             output.innerHTML = `<pre>${result}</pre>`;
           }
         })
         .catch(error => {
-          output.textContent = "Error: " + error.message;
+          output.innerHTML = `<p class='error'>Error: ${error.message}</p>`;
         });
     }
 
