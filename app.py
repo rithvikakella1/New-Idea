@@ -8,8 +8,9 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()  
 
-# Serve static files from a folder if you have CSS/JS/etc.
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Serve static files from a folder if present
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Serve the landing page
 @app.get("/", response_class=HTMLResponse)
@@ -20,8 +21,6 @@ async def serve_landing():
 # Load OpenAI key from environment
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-app = FastAPI()
-
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
@@ -30,6 +29,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+import json
+import re
 
 # Request model
 class NoteInput(BaseModel):
@@ -54,30 +56,98 @@ Respond in this JSON format:
 Clinical Note:
 """
 
+def _normalize_to_sorted_json(text: str) -> str:
+    # Remove code fences if present
+    cleaned = re.sub(r"```json|```", "", text).strip()
+
+    # Try to extract JSON array portion
+    start = cleaned.find("[")
+    end = cleaned.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        candidate = cleaned[start:end + 1]
+    else:
+        candidate = cleaned
+
+    try:
+        data = json.loads(candidate)
+        if isinstance(data, list):
+            # Sort list deterministically by key tuple if dicts
+            def sort_key(item):
+                if isinstance(item, dict):
+                    return (
+                        str(item.get("type", "")),
+                        str(item.get("code_type", "")),
+                        str(item.get("code", "")),
+                        str(item.get("description", "")),
+                        str(item.get("reasoning", "")),
+                    )
+                return str(item)
+
+            sorted_list = sorted(data, key=sort_key)
+            return json.dumps(sorted_list, sort_keys=True, ensure_ascii=False)
+        # If not a list, fall back to cleaned string
+        return cleaned
+    except Exception:
+        # If parsing fails, return cleaned text
+        return cleaned
+
+
 # Core logic
 def extract_medical_codes(note: str) -> str:
     full_prompt = prompt_template + note.strip()
 
-    client = OpenAI()  # uses OPENAI_API_KEY from env
-    response = client.chat.completions.create(
-    model="gpt-3.5-turbo",
-    messages=[
-        {"role": "system", "content": "You are a thorough and accurate medical coding assistant. Include all diagnoses (including comorbidities and risk factors), procedures (including lab tests and imaging), and explain each with short reasoning."
-},
-        {"role": "user", "content": full_prompt}
-    ],
-    temperature=0.2
-
-
+    # Build request with deterministic settings
+    kwargs = dict(
+        model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a thorough and accurate medical coding assistant. "
+                    "Include all diagnoses (including comorbidities and risk factors), "
+                    "procedures (including lab tests and imaging), and explain each with short reasoning."
+                ),
+            },
+            {"role": "user", "content": full_prompt},
+        ],
+        temperature=0,
+        top_p=1,
+        n=1,
+        presence_penalty=0,
+        frequency_penalty=0,
     )
-    return response.choices[0].message.content
+
+    seed_env = os.getenv("OPENAI_SEED")
+    used_seed = None
+    if seed_env:
+        try:
+            used_seed = int(seed_env)
+            kwargs["seed"] = used_seed
+        except Exception:
+            used_seed = None
+
+    try:
+        response = client.chat.completions.create(**kwargs)
+    except Exception as e:
+        # Fallback if the API rejects the seed parameter
+        if "seed" in kwargs:
+            try:
+                kwargs.pop("seed", None)
+                response = client.chat.completions.create(**kwargs)
+            except Exception:
+                raise e
+        else:
+            raise e
+
+    content = response.choices[0].message.content
+    return _normalize_to_sorted_json(content)
 
 
 
-# Root health check
-@app.get("/")
-def root():
-    return {"message": "Hello from New Idea!"}
+# Root health check (moved to /health to avoid / landing conflict)
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 # Main endpoint
 @app.post("/api/extract")
