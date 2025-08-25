@@ -107,12 +107,20 @@
         .then(response => response.json())
         .then(data => {
           let result = data.result || JSON.stringify(data, null, 2);
-
           result = result.replace(/```json|```/g, '').trim();
 
           try {
             const parsed = JSON.parse(result);
-            output.innerHTML = formatTable(parsed);
+            if (Array.isArray(parsed)) {
+              output.innerHTML = sectionHTML({ final: parsed, additional: [] });
+            } else if (parsed && typeof parsed === 'object' && (Array.isArray(parsed.final) || Array.isArray(parsed.additional))) {
+              output.innerHTML = sectionHTML({
+                final: Array.isArray(parsed.final) ? parsed.final : [],
+                additional: Array.isArray(parsed.additional) ? parsed.additional : []
+              });
+            } else {
+              output.innerHTML = `<pre>${result}</pre>`;
+            }
           } catch (e) {
             output.innerHTML = `<pre>${result}</pre>`;
           }
@@ -124,7 +132,6 @@
 
     function formatTable(codes) {
       if (!Array.isArray(codes)) return "⚠️ Unexpected response format.";
-
       let table = `
         <table>
           <thead>
@@ -133,26 +140,48 @@
               <th>Code Type</th>
               <th>Code</th>
               <th>Description</th>
+              <th>Modifiers</th>
+              <th>Qty</th>
+              <th>Diagnosis Pointers</th>
               <th>Reasoning</th>
             </tr>
           </thead>
           <tbody>
       `;
-
       for (const code of codes) {
+        const modifiers = Array.isArray(code.modifiers) ? code.modifiers.join(', ') : '';
+        const qty = (typeof code.quantity === 'number' || typeof code.quantity === 'string') ? code.quantity : '';
+        const pointers = Array.isArray(code.diagnosis_pointers) ? code.diagnosis_pointers.join(', ') : '';
         table += `
           <tr>
-            <td>${code.type}</td>
-            <td>${code.code_type}</td>
-            <td>${code.code}</td>
-            <td>${code.description}</td>
-            <td>${code.reasoning}</td>
+            <td>${code.type || ''}</td>
+            <td>${code.code_type || ''}</td>
+            <td>${code.code || ''}</td>
+            <td>${code.description || ''}</td>
+            <td>${modifiers}</td>
+            <td>${qty}</td>
+            <td>${pointers}</td>
+            <td>${code.reasoning || ''}</td>
           </tr>
         `;
       }
-
       table += `</tbody></table>`;
       return table;
+    }
+
+    function sectionHTML(obj) {
+      const finalTable = formatTable(obj.final || []);
+      const additionalTable = formatTable(obj.additional || []);
+      return `
+        <div>
+          <h3>Final Billable Codes</h3>
+          ${finalTable}
+        </div>
+        <div style="margin-top:24px;">
+          <h3>Additional Possible Codes</h3>
+          ${additionalTable}
+        </div>
+      `;
     }
   </script>
 

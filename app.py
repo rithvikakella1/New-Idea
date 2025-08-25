@@ -39,35 +39,43 @@ class NoteInput(BaseModel):
 
 # Prompt template
 prompt_template = """
-You are a professional medical coder. Given a clinical note, output ONLY the codes that would appear on the FINAL medical billing claim (CMS-1500/UB-04).
+You are a professional medical coder. Given a clinical note, output the codes relevant to the medical billing claim (CMS-1500/UB-04) in TWO sections:
 
-Rules:
-- Include billable ICD-10-CM diagnosis codes actually used for this encounter. Identify primary vs secondary implicitly by relevance, but do not add extra fields for that unless asked.
-- Include CPT/HCPCS procedure codes for services performed. Include modifiers (e.g., 25, 59, RT/LT) and quantity when indicated by the note.
-- For each CPT line, include diagnosis_pointers as an array of ICD-10 codes from your list that justify the service.
-- Exclude differentials, suspected conditions without confirmation, historical problems not impacting care today, and general screening codes unless clearly applicable.
-- Deduplicate and ensure only claim-ready, billable codes remain.
+1) final: Only claim-ready, billable codes that would be placed on the claim today.
+2) additional: Other plausible codes that could appear depending on payer rules, documentation details, or coder discretion (do NOT include differentials or non-billable items).
 
-Respond with a pure JSON array only. Use these shapes:
-[
-  {
-    "type": "Diagnosis",
-    "code_type": "ICD-10",
-    "code": "<ICD-10-CM code>",
-    "description": "<billable diagnosis description>",
-    "reasoning": "<brief justification>"
-  },
-  {
-    "type": "Procedure",
-    "code_type": "CPT",
-    "code": "<CPT/HCPCS code>",
-    "description": "<procedure description>",
-    "modifiers": ["<modifier>"],
-    "quantity": 1,
-    "diagnosis_pointers": ["<ICD-10 code>", "<ICD-10 code>"] ,
-    "reasoning": "<brief justification>"
-  }
-]
+Rules for both sections:
+- ICD-10-CM: Include only billable diagnosis codes pertinent to the encounter.
+- CPT/HCPCS: Include procedures/services actually performed or likely claimable; add modifiers (e.g., 25, 59, RT/LT) and quantity where applicable.
+- For each CPT line, include diagnosis_pointers referencing ICD-10 codes from the same section that justify the service.
+- Exclude suspected conditions without confirmation, historical problems not impacting care today, and generic screening unless clearly applicable.
+- Deduplicate codes within each section.
+
+Respond with a pure JSON object only, with this shape:
+{
+  "final": [
+    {
+      "type": "Diagnosis",
+      "code_type": "ICD-10",
+      "code": "<ICD-10-CM code>",
+      "description": "<billable diagnosis description>",
+      "reasoning": "<brief justification>"
+    },
+    {
+      "type": "Procedure",
+      "code_type": "CPT",
+      "code": "<CPT/HCPCS code>",
+      "description": "<procedure description>",
+      "modifiers": ["<modifier>"],
+      "quantity": 1,
+      "diagnosis_pointers": ["<ICD-10 code>", "<ICD-10 code>"],
+      "reasoning": "<brief justification>"
+    }
+  ],
+  "additional": [
+    // Same object shapes as in "final". Keep to likely, plausible claim codes only.
+  ]
+}
 
 Clinical Note:
 """
@@ -84,43 +92,48 @@ def _normalize_to_sorted_json(text: str) -> str:
     else:
         candidate = cleaned
 
+    def sort_key(item):
+        if isinstance(item, dict):
+            modifiers = item.get("modifiers") or []
+            if isinstance(modifiers, list):
+                modifiers_key = ",".join(map(str, modifiers))
+            else:
+                modifiers_key = str(modifiers)
+
+            diagnosis_pointers = item.get("diagnosis_pointers") or []
+            if isinstance(diagnosis_pointers, list):
+                pointers_key = ",".join(map(str, diagnosis_pointers))
+            else:
+                pointers_key = str(diagnosis_pointers)
+
+            return (
+                str(item.get("type", "")),
+                str(item.get("code_type", "")),
+                str(item.get("code", "")),
+                str(item.get("description", "")),
+                modifiers_key,
+                str(item.get("quantity", "")),
+                pointers_key,
+                str(item.get("reasoning", "")),
+            )
+        return str(item)
+
     try:
         data = json.loads(candidate)
         if isinstance(data, list):
-            # Sort list deterministically by key tuple if dicts
-            def sort_key(item):
-                if isinstance(item, dict):
-                    modifiers = item.get("modifiers") or []
-                    if isinstance(modifiers, list):
-                        modifiers_key = ",".join(map(str, modifiers))
-                    else:
-                        modifiers_key = str(modifiers)
-
-                    diagnosis_pointers = item.get("diagnosis_pointers") or []
-                    if isinstance(diagnosis_pointers, list):
-                        pointers_key = ",".join(map(str, diagnosis_pointers))
-                    else:
-                        pointers_key = str(diagnosis_pointers)
-
-                    return (
-                        str(item.get("type", "")),
-                        str(item.get("code_type", "")),
-                        str(item.get("code", "")),
-                        str(item.get("description", "")),
-                        modifiers_key,
-                        str(item.get("quantity", "")),
-                        pointers_key,
-                        str(item.get("reasoning", "")),
-                    )
-                return str(item)
-
             sorted_list = sorted(data, key=sort_key)
-            return json.dumps(sorted_list, sort_keys=True, ensure_ascii=False)
-        # If not a list, fall back to cleaned string
-        return cleaned
+            return json.dumps({"final": sorted_list, "additional": []}, sort_keys=True, ensure_ascii=False)
+        if isinstance(data, dict):
+            final_list = data.get("final") or []
+            additional_list = data.get("additional") or []
+            if isinstance(final_list, list):
+                final_list = sorted(final_list, key=sort_key)
+            if isinstance(additional_list, list):
+                additional_list = sorted(additional_list, key=sort_key)
+            return json.dumps({"final": final_list, "additional": additional_list}, sort_keys=True, ensure_ascii=False)
+        return json.dumps({"final": [], "additional": []}, sort_keys=True, ensure_ascii=False)
     except Exception:
-        # If parsing fails, return cleaned text
-        return cleaned
+        return json.dumps({"final": [], "additional": []}, sort_keys=True, ensure_ascii=False)
 
 
 # Core logic
