@@ -39,19 +39,35 @@ class NoteInput(BaseModel):
 
 # Prompt template
 prompt_template = """
-You are a professional medical coder. Given a clinical note, extract **all possible** relevant ICD-10 diagnosis codes and CPT procedure codes. Include codes for symptoms, comorbidities, tests, and treatments, not just the primary diagnosis.
+You are a professional medical coder. Given a clinical note, output ONLY the codes that would appear on the FINAL medical billing claim (CMS-1500/UB-04).
 
-Respond in this JSON format:
+Rules:
+- Include billable ICD-10-CM diagnosis codes actually used for this encounter. Identify primary vs secondary implicitly by relevance, but do not add extra fields for that unless asked.
+- Include CPT/HCPCS procedure codes for services performed. Include modifiers (e.g., 25, 59, RT/LT) and quantity when indicated by the note.
+- For each CPT line, include diagnosis_pointers as an array of ICD-10 codes from your list that justify the service.
+- Exclude differentials, suspected conditions without confirmation, historical problems not impacting care today, and general screening codes unless clearly applicable.
+- Deduplicate and ensure only claim-ready, billable codes remain.
+
+Respond with a pure JSON array only. Use these shapes:
 [
   {
-    "type": "Diagnosis" or "Procedure",
-    "code_type": "ICD-10" or "CPT",
-    "code": "<code>",
-    "description": "<description>",
-    "reasoning": "<short justification>"
+    "type": "Diagnosis",
+    "code_type": "ICD-10",
+    "code": "<ICD-10-CM code>",
+    "description": "<billable diagnosis description>",
+    "reasoning": "<brief justification>"
+  },
+  {
+    "type": "Procedure",
+    "code_type": "CPT",
+    "code": "<CPT/HCPCS code>",
+    "description": "<procedure description>",
+    "modifiers": ["<modifier>"],
+    "quantity": 1,
+    "diagnosis_pointers": ["<ICD-10 code>", "<ICD-10 code>"] ,
+    "reasoning": "<brief justification>"
   }
 ]
-
 
 Clinical Note:
 """
@@ -74,11 +90,26 @@ def _normalize_to_sorted_json(text: str) -> str:
             # Sort list deterministically by key tuple if dicts
             def sort_key(item):
                 if isinstance(item, dict):
+                    modifiers = item.get("modifiers") or []
+                    if isinstance(modifiers, list):
+                        modifiers_key = ",".join(map(str, modifiers))
+                    else:
+                        modifiers_key = str(modifiers)
+
+                    diagnosis_pointers = item.get("diagnosis_pointers") or []
+                    if isinstance(diagnosis_pointers, list):
+                        pointers_key = ",".join(map(str, diagnosis_pointers))
+                    else:
+                        pointers_key = str(diagnosis_pointers)
+
                     return (
                         str(item.get("type", "")),
                         str(item.get("code_type", "")),
                         str(item.get("code", "")),
                         str(item.get("description", "")),
+                        modifiers_key,
+                        str(item.get("quantity", "")),
+                        pointers_key,
                         str(item.get("reasoning", "")),
                     )
                 return str(item)
