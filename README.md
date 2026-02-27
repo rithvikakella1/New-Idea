@@ -17,7 +17,6 @@ pip install -r requirements.txt
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-# Optional: set a seed to increase reproducibility
 export OPENAI_SEED=42
 
 uvicorn app:app --host 0.0.0.0 --port 8000
