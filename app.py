@@ -13,7 +13,7 @@ if os.path.isdir("static"):
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_landing():
-    with open("landing.html", "r", encoding="utf-8") as f:
+    with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
