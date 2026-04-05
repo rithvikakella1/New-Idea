@@ -1,30 +1,26 @@
 import os
 from openai import OpenAI
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-app = FastAPI()  
+app = FastAPI()
 
-# Serve static files from a folder if present
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Serve the landing page
 @app.get("/", response_class=HTMLResponse)
 async def serve_landing():
     with open("landing.html", "r", encoding="utf-8") as f:
         return f.read()
 
-# Load OpenAI key from environment
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,34 +29,32 @@ app.add_middleware(
 import json
 import re
 
-# Request model
 class NoteInput(BaseModel):
     note: str
 
-# Prompt template
 prompt_template = """
-You are a professional medical coder. Given a clinical note, extract **all possible** relevant ICD-10 diagnosis codes and CPT procedure codes. Include codes for symptoms, comorbidities, tests, and treatments, not just the primary diagnosis.
+You are a professional medical coder. Given a clinical note, extract all relevant ICD-10 diagnosis codes and CPT procedure codes.
 
-Respond in this JSON format:
+For each code, include a confidence score between 0 and 1 indicating how certain you are.
+
+Respond strictly in this JSON format:
 [
   {
-    "type": "Diagnosis" or "Procedure",
-    "code_type": "ICD-10" or "CPT",
+    "type": "Diagnosis or Procedure",
+    "code_type": "ICD-10 or CPT",
     "code": "<code>",
     "description": "<description>",
-    "reasoning": "<short justification>"
+    "reasoning": "<short justification>",
+    "confidence": <float between 0 and 1>
   }
 ]
-
 
 Clinical Note:
 """
 
 def _normalize_to_sorted_json(text: str) -> str:
-    # Remove code fences if present
     cleaned = re.sub(r"```json|```", "", text).strip()
 
-    # Try to extract JSON array portion
     start = cleaned.find("[")
     end = cleaned.rfind("]")
     if start != -1 and end != -1 and end > start:
@@ -70,86 +64,60 @@ def _normalize_to_sorted_json(text: str) -> str:
 
     try:
         data = json.loads(candidate)
+
+        def coerce(item):
+            if isinstance(item, dict) and "confidence" in item:
+                try:
+                    item["confidence"] = float(item["confidence"])
+                except:
+                    item["confidence"] = 0.0
+            return item
+
+        def sort_key(item):
+            if isinstance(item, dict):
+                return (
+                    str(item.get("type", "")),
+                    str(item.get("code_type", "")),
+                    str(item.get("code", "")),
+                    str(item.get("confidence", "")),
+                )
+            return str(item)
+
         if isinstance(data, list):
-            # Sort list deterministically by key tuple if dicts
-            def sort_key(item):
-                if isinstance(item, dict):
-                    return (
-                        str(item.get("type", "")),
-                        str(item.get("code_type", "")),
-                        str(item.get("code", "")),
-                        str(item.get("description", "")),
-                        str(item.get("reasoning", "")),
-                    )
-                return str(item)
+            data = [coerce(x) for x in data]
+            return json.dumps(sorted(data, key=sort_key), sort_keys=True, ensure_ascii=False)
 
-            sorted_list = sorted(data, key=sort_key)
-            return json.dumps(sorted_list, sort_keys=True, ensure_ascii=False)
-        # If not a list, fall back to cleaned string
         return cleaned
-    except Exception:
-        # If parsing fails, return cleaned text
+    except:
         return cleaned
 
 
-# Core logic
 def extract_medical_codes(note: str) -> str:
     full_prompt = prompt_template + note.strip()
 
-    # Build request with deterministic settings
     kwargs = dict(
-        model="gpt-3.5-turbo",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
-                "content": (
-                    "You are a thorough and accurate medical coding assistant. "
-                    "Include all diagnoses (including comorbidities and risk factors), "
-                    "procedures (including lab tests and imaging), and explain each with short reasoning."
-                ),
+                "content": "You are a precise medical coding assistant. Always include confidence scores between 0 and 1."
             },
             {"role": "user", "content": full_prompt},
         ],
         temperature=0,
         top_p=1,
-        n=1,
-        presence_penalty=0,
-        frequency_penalty=0,
     )
 
-    seed_env = os.getenv("OPENAI_SEED")
-    used_seed = None
-    if seed_env:
-        try:
-            used_seed = int(seed_env)
-            kwargs["seed"] = used_seed
-        except Exception:
-            used_seed = None
-
-    try:
-        response = client.chat.completions.create(**kwargs)
-    except Exception as e:
-        # Fallback if the API rejects the seed parameter
-        if "seed" in kwargs:
-            try:
-                kwargs.pop("seed", None)
-                response = client.chat.completions.create(**kwargs)
-            except Exception:
-                raise e
-        else:
-            raise e
-
+    response = client.chat.completions.create(**kwargs)
     content = response.choices[0].message.content
     return _normalize_to_sorted_json(content)
 
 
-
-# Root health check (moved to /health to avoid / landing conflict)
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-# Main endpoint
+
 @app.post("/api/extract")
 def api_extract(input: NoteInput):
     if not input.note.strip():
