@@ -1,7 +1,9 @@
-Flask
-flask-cors
-openai
-waitress
-uvicorn
 fastapi
-
+uvicorn
+openai
+python-multipart
+python-dotenv
+slowapi
+python-jose[cryptography]
+bcrypt
+cryptography

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>hAIven Health – AI Medical Code Extractor</title>
+  <title>MoBILLity – AI Medical Code Extractor</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     :root {
@@ -19,6 +19,7 @@
       --white: #ffffff;
       --border: rgba(10,22,40,0.09);
       --success: #10b981;
+      --warning: #f59e0b;
       --error: #ef4444;
     }
 
@@ -81,10 +82,34 @@
     }
     .nav-back:hover { background: var(--teal) !important; color: var(--navy) !important; }
 
+    .nav-user {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .nav-username {
+      font-size: 0.82rem;
+      color: var(--text-mid);
+      font-weight: 500;
+    }
+    .btn-logout {
+      background: none;
+      border: 1.5px solid var(--border);
+      color: var(--text-mid);
+      padding: 0.4rem 0.9rem;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-logout:hover { border-color: var(--error); color: var(--error); }
+
     /* ── MAIN LAYOUT ── */
     main {
       flex: 1;
-      max-width: 860px;
+      max-width: 920px;
       width: 100%;
       margin: 0 auto;
       padding: 3rem 2rem 5rem;
@@ -184,6 +209,10 @@
       display: block;
     }
 
+    .textarea-wrap {
+      position: relative;
+    }
+
     textarea {
       width: 100%;
       min-height: 140px;
@@ -204,6 +233,10 @@
       border-color: var(--teal);
       box-shadow: 0 0 0 3px rgba(0,194,168,0.1);
     }
+    textarea.listening {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
+    }
 
     .form-footer {
       display: flex;
@@ -214,12 +247,18 @@
       gap: 0.8rem;
     }
 
+    .form-footer-left {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
     .char-count {
       font-size: 0.78rem;
       color: var(--text-light);
     }
 
-    /* ── BUTTON ── */
+    /* ── BUTTONS ── */
     .btn-analyze {
       display: inline-flex;
       align-items: center;
@@ -242,10 +281,34 @@
       transform: translateY(-1px);
       box-shadow: 0 6px 20px rgba(0,194,168,0.28);
     }
-    .btn-analyze:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+    .btn-analyze:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Mic button */
+    .btn-mic {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--white);
+      color: var(--text-mid);
+      padding: 0.8rem 1.2rem;
+      border-radius: 50px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      border: 1.5px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
     }
+    .btn-mic:hover { border-color: var(--teal); color: var(--teal); }
+    .btn-mic.listening {
+      background: rgba(239,68,68,0.08);
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+    .btn-mic.listening .mic-pulse {
+      animation: pulse 1s ease-in-out infinite;
+    }
+    .mic-no-support { display: none; }
 
     /* ── DIVIDER ── */
     .divider {
@@ -358,6 +421,7 @@
       overflow-x: auto;
       border-radius: 14px;
       border: 1px solid var(--border);
+      margin-bottom: 1.5rem;
     }
 
     table {
@@ -389,7 +453,7 @@
     tbody td {
       padding: 0.9rem 1rem;
       color: var(--text-dark);
-      vertical-align: top;
+      vertical-align: middle;
       line-height: 1.5;
     }
 
@@ -426,7 +490,137 @@
     .td-reasoning {
       color: var(--text-mid);
       font-size: 0.83rem;
+      max-width: 220px;
     }
+
+    /* Confidence bar */
+    .conf-cell { min-width: 110px; }
+    .conf-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .conf-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--cream-dark);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .conf-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+    .conf-fill.high { background: var(--success); }
+    .conf-fill.med  { background: var(--warning); }
+    .conf-fill.low  { background: var(--error); }
+    .conf-pct {
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .conf-pct.high { color: var(--success); }
+    .conf-pct.med  { color: var(--warning); }
+    .conf-pct.low  { color: var(--error); }
+
+    /* Doc strength badge */
+    .doc-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .doc-strong { background: rgba(16,185,129,0.12); color: var(--success); }
+    .doc-moderate { background: rgba(245,158,11,0.12); color: var(--warning); }
+    .doc-weak { background: rgba(239,68,68,0.1); color: var(--error); }
+
+    /* Billing priority tag */
+    .priority-tag {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-light);
+      text-transform: capitalize;
+    }
+
+    /* ── SUGGESTED CODES ── */
+    .suggested-section {
+      margin-top: 0.5rem;
+      animation: fadeUp 0.5s 0.1s ease both;
+    }
+
+    .suggested-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.8rem;
+    }
+    .suggested-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.1rem;
+      color: var(--navy);
+    }
+    .suggested-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.25);
+      color: var(--warning);
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .suggested-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+
+    .sug-card {
+      background: rgba(245,158,11,0.04);
+      border: 1px solid rgba(245,158,11,0.18);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      animation: popIn 0.3s ease both;
+    }
+    .sug-card-top {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .sug-code {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--navy);
+    }
+    .sug-desc {
+      font-size: 0.83rem;
+      color: var(--text-mid);
+      font-weight: 500;
+    }
+    .sug-reason {
+      font-size: 0.8rem;
+      color: var(--text-mid);
+      margin-bottom: 0.3rem;
+      line-height: 1.5;
+    }
+    .sug-doc-needed {
+      font-size: 0.78rem;
+      color: var(--warning);
+      font-weight: 600;
+    }
+    .sug-doc-needed::before { content: '📋 Needs: '; }
 
     /* Error state */
     .error-box {
@@ -464,9 +658,7 @@
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .spinner {
       display: inline-block;
       width: 14px; height: 14px;
@@ -489,13 +681,17 @@
 
   <!-- NAV -->
   <nav>
-    <a class="nav-logo" href="landing.html"><span>h</span>AIven Health</a>
+    <a class="nav-logo" href="/"><span>M</span>oBILLity</a>
     <ul class="nav-links">
-      <li><a href="landing.html">Home</a></li>
-      <li><a href="landing.html#features">Features</a></li>
-      <li><a href="landing.html#compliance">Compliance</a></li>
-      <li><a href="landing.html" class="nav-back">← Back to Home</a></li>
+      <li><a href="/">Home</a></li>
+      <li><a href="/#features">Features</a></li>
+      <li><a href="/#compliance">Compliance</a></li>
+      <li><a href="/" class="nav-back">← Back to Home</a></li>
     </ul>
+    <div class="nav-user">
+      <span class="nav-username" id="navUsername"></span>
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
   </nav>
 
   <!-- MAIN -->
@@ -504,7 +700,7 @@
     <div class="page-header">
       <div class="page-badge"><span class="badge-dot"></span>Live Extraction</div>
       <h1>Medical Code <em>Extractor</em></h1>
-      <p>Paste any clinical note below and let our AI identify and map the correct ICD-10 and CPT codes instantly.</p>
+      <p>Paste or dictate any clinical note and let our AI identify and map the correct ICD-10 and CPT codes instantly.</p>
     </div>
 
     <div class="card">
@@ -512,19 +708,27 @@
         <div class="chrome-dot"></div>
         <div class="chrome-dot"></div>
         <div class="chrome-dot"></div>
-        <span class="chrome-title">hAIven Health — Code Extractor</span>
+        <span class="chrome-title">MoBILLity — Physician Billing Coder</span>
       </div>
 
       <div class="card-body">
 
         <label class="field-label" for="noteInput">Clinical Note</label>
-        <textarea
-          id="noteInput"
-          placeholder="e.g. Patient presents with Type 2 diabetes mellitus with diabetic nephropathy. History of essential hypertension. Prescribed metformin and lisinopril…"
-        ></textarea>
+        <div class="textarea-wrap">
+          <textarea
+            id="noteInput"
+            placeholder="e.g. Patient presents with Type 2 diabetes mellitus with diabetic nephropathy. History of essential hypertension. Prescribed metformin and lisinopril…"
+          ></textarea>
+        </div>
 
         <div class="form-footer">
-          <span class="char-count" id="charCount">0 characters</span>
+          <div class="form-footer-left">
+            <span class="char-count" id="charCount">0 characters</span>
+            <!-- Speech-to-Text button (hidden if not supported) -->
+            <button class="btn-mic" id="micBtn" onclick="toggleSpeech()" title="Dictate clinical note">
+              🎤 Dictate
+            </button>
+          </div>
           <button class="btn-analyze" id="analyzeBtn" onclick="sendNote()">
             🧠 Analyze Note
           </button>
@@ -549,20 +753,127 @@
 
   <!-- FOOTER -->
   <footer>
-    <a class="footer-logo" href="landing.html"><span>h</span>AIven Health</a>
-    <span>© 2025 hAIven Health. All rights reserved.</span>
-    <span>Powered by Claude AI</span>
+    <a class="footer-logo" href="/"><span>M</span>oBILLity</a>
+    <span></span>
+    <span>HIPAA Compliant · AES-256 · TLS 1.2+</span>
   </footer>
 
   <script>
-    // Char counter
-    const noteInput = document.getElementById('noteInput');
-    const charCount = document.getElementById('charCount');
-    noteInput.addEventListener('input', () => {
-      const n = noteInput.value.length;
-      charCount.textContent = `${n} character${n !== 1 ? 's' : ''}`;
-    });
+    // ── AUTH GUARD ────────────────────────────────────────────────────────────
+    const API_BASE = window.location.origin;
 
+    function isTokenValid(token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.exp * 1000 > Date.now();
+      } catch { return false; }
+    }
+
+    function getToken() {
+      return localStorage.getItem('auth_token');
+    }
+
+    function logout() {
+      localStorage.removeItem('auth_token');
+      window.location.href = '/login';
+    }
+
+    (function guardPage() {
+      const token = getToken();
+      if (!token || !isTokenValid(token)) {
+        window.location.href = '/login';
+        return;
+      }
+      // Show username from JWT payload
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const el = document.getElementById('navUsername');
+        if (el && payload.sub) el.textContent = payload.sub;
+      } catch {}
+    })();
+
+    // ── SPEECH TO TEXT ────────────────────────────────────────────────────────
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isListening = false;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalText += event.results[i][0].transcript + ' ';
+          }
+        }
+        if (finalText) {
+          const ta = document.getElementById('noteInput');
+          ta.value += (ta.value && !ta.value.endsWith(' ') ? ' ' : '') + finalText.trim();
+          updateCharCount();
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech error:', event.error);
+        if (event.error === 'not-allowed') {
+          alert('Microphone access denied. Please allow microphone access and try again.');
+        }
+        isListening = false;
+        updateMicBtn();
+      };
+
+      recognition.onend = () => {
+        // Restart if still toggled on (handles auto-stop after silence)
+        if (isListening) recognition.start();
+      };
+    } else {
+      // Browser doesn't support speech recognition
+      const micBtn = document.getElementById('micBtn');
+      if (micBtn) micBtn.style.display = 'none';
+    }
+
+    function toggleSpeech() {
+      if (!recognition) return;
+      isListening = !isListening;
+      if (isListening) {
+        recognition.start();
+      } else {
+        recognition.stop();
+      }
+      updateMicBtn();
+    }
+
+    function updateMicBtn() {
+      const btn = document.getElementById('micBtn');
+      const ta  = document.getElementById('noteInput');
+      if (!btn) return;
+      if (isListening) {
+        btn.innerHTML = '🔴 Stop Dictation';
+        btn.classList.add('listening');
+        ta.classList.add('listening');
+        ta.placeholder = 'Listening… speak your clinical note.';
+      } else {
+        btn.innerHTML = '🎤 Dictate';
+        btn.classList.remove('listening');
+        ta.classList.remove('listening');
+        ta.placeholder = 'e.g. Patient presents with Type 2 diabetes mellitus with diabetic nephropathy…';
+      }
+    }
+
+    // ── CHAR COUNTER ──────────────────────────────────────────────────────────
+    const noteInput = document.getElementById('noteInput');
+
+    function updateCharCount() {
+      const n = noteInput.value.length;
+      document.getElementById('charCount').textContent = `${n} character${n !== 1 ? 's' : ''}`;
+    }
+    noteInput.addEventListener('input', updateCharCount);
+
+    // ── PROGRESS / STATUS ─────────────────────────────────────────────────────
     const progressFill = document.getElementById('progressFill');
     const statusMsg    = document.getElementById('statusMsg');
     const analyzeBtn   = document.getElementById('analyzeBtn');
@@ -581,11 +892,19 @@
         : '🧠 Analyze Note';
     }
 
+    // ── MAIN SEND ─────────────────────────────────────────────────────────────
     function sendNote() {
       const note = noteInput.value.trim();
       if (!note) {
         setProgress(0, 'Please enter a clinical note.', 'error');
         return;
+      }
+
+      // Stop dictation if active
+      if (isListening) {
+        isListening = false;
+        if (recognition) recognition.stop();
+        updateMicBtn();
       }
 
       output.className = '';
@@ -599,28 +918,38 @@
         progressFill.style.width = prog + '%';
       }, 300);
 
-      fetch("https://new-idea-ry0n.onrender.com/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note })
+      const token = getToken();
+
+      fetch(`${API_BASE}/api/extract`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ note }),
       })
-        .then(r => r.json())
+        .then(r => {
+          if (r.status === 401) {
+            logout(); // Token expired — redirect to login
+            return;
+          }
+          if (!r.ok) return r.json().then(d => Promise.reject(new Error(d.detail || r.statusText)));
+          return r.json();
+        })
         .then(data => {
+          if (!data) return; // handled by logout redirect
           clearInterval(ticker);
           setProgress(100, '✓ Complete', 'done');
           setLoading(false);
 
-          let result = data.result || JSON.stringify(data, null, 2);
-          result = result.replace(/```json|```/g, '').trim();
-
-          try {
-            const parsed = JSON.parse(result);
-            output.innerHTML = formatResults(parsed);
-            output.className = 'visible';
-          } catch (e) {
-            output.innerHTML = `<pre style="font-size:0.85rem;color:var(--text-mid);white-space:pre-wrap;">${result}</pre>`;
-            output.className = 'visible';
+          const result = data.result;
+          if (result && (result.confirmed_codes !== undefined)) {
+            output.innerHTML = formatResults(result);
+          } else {
+            // Fallback for unexpected shapes
+            output.innerHTML = `<pre style="font-size:0.85rem;color:var(--text-mid);white-space:pre-wrap;">${JSON.stringify(result, null, 2)}</pre>`;
           }
+          output.className = 'visible';
         })
         .catch(err => {
           clearInterval(ticker);
@@ -631,45 +960,115 @@
         });
     }
 
-    function formatResults(codes) {
-      if (!Array.isArray(codes) || codes.length === 0) {
+    // ── FORMAT RESULTS ────────────────────────────────────────────────────────
+    function confClass(conf) {
+      return conf >= 0.8 ? 'high' : conf >= 0.5 ? 'med' : 'low';
+    }
+
+    function docBadge(strength) {
+      const map = {
+        strong:   '<span class="doc-badge doc-strong">Strong</span>',
+        moderate: '<span class="doc-badge doc-moderate">Moderate</span>',
+        weak:     '<span class="doc-badge doc-weak">Weak</span>',
+      };
+      return map[(strength || '').toLowerCase()] || '';
+    }
+
+    function formatResults(data) {
+      const confirmed = Array.isArray(data.confirmed_codes) ? data.confirmed_codes : [];
+      const suggested = Array.isArray(data.suggested_codes) ? data.suggested_codes : [];
+
+      if (confirmed.length === 0 && suggested.length === 0) {
         return '<div class="error-box">⚠️ No codes were found in this note.</div>';
       }
 
-      const chips = codes.map((c, i) => `
+      // ── Chips row
+      const chips = confirmed.map((c, i) => `
         <div class="chip" style="animation-delay:${i * 80}ms">
           <span class="chip-type">${c.code_type || c.type || 'CODE'}</span>${c.code}
         </div>`).join('');
 
-      const rows = codes.map((c, i) => {
+      // ── Confirmed codes table
+      const rows = confirmed.map((c, i) => {
         const typeLabel = (c.code_type || '').toUpperCase();
         const badge = (typeLabel === 'ICD-10' || typeLabel === 'ICD')
           ? `<span class="badge-icd">${typeLabel}</span>`
           : `<span class="badge-cpt">${typeLabel || c.type || 'CPT'}</span>`;
+
+        const conf    = parseFloat(c.confidence) || 0;
+        const pct     = Math.round(conf * 100);
+        const cls     = confClass(conf);
+
         return `<tr style="animation-delay:${i * 60}ms">
-          <td>${badge}</td>
+          <td>${badge}<br><span class="priority-tag">${c.billing_priority || ''}</span></td>
           <td class="td-code">${c.code}</td>
           <td>${c.description || '—'}</td>
           <td class="td-reasoning">${c.reasoning || '—'}</td>
+          <td>${docBadge(c.documentation_strength)}</td>
+          <td class="conf-cell">
+            <div class="conf-bar-wrap">
+              <div class="conf-bar"><div class="conf-fill ${cls}" style="width:${pct}%"></div></div>
+              <span class="conf-pct ${cls}">${pct}%</span>
+            </div>
+          </td>
         </tr>`;
       }).join('');
 
+      // ── Suggested codes section
+      let suggestedHtml = '';
+      if (suggested.length > 0) {
+        const sugCards = suggested.map((s, i) => {
+          const typeLabel = (s.code_type || '').toUpperCase();
+          const badge = (typeLabel === 'ICD-10' || typeLabel === 'ICD')
+            ? `<span class="badge-icd">${typeLabel}</span>`
+            : `<span class="badge-cpt">${typeLabel}</span>`;
+          return `
+          <div class="sug-card" style="animation-delay:${i * 60}ms">
+            <div class="sug-card-top">
+              ${badge}
+              <span class="sug-code">${s.code}</span>
+              <span class="sug-desc">${s.description || ''}</span>
+            </div>
+            <p class="sug-reason">${s.reason_suggested || ''}</p>
+            ${s.documentation_needed ? `<p class="sug-doc-needed">${s.documentation_needed}</p>` : ''}
+          </div>`;
+        }).join('');
+
+        suggestedHtml = `
+          <div class="suggested-section">
+            <div class="suggested-header">
+              <span class="results-title">Suggested Codes</span>
+              <span class="suggested-badge">⚠ Needs Clarification</span>
+            </div>
+            <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.8rem;">
+              These codes may apply based on clinical context but require physician confirmation or additional documentation before billing.
+            </p>
+            <div class="suggested-cards">${sugCards}</div>
+          </div>`;
+      }
+
       return `
         <div class="results-header">
-          <span class="results-title">Extracted Codes</span>
-          <span class="results-meta">${codes.length} code${codes.length !== 1 ? 's' : ''} found</span>
+          <span class="results-title">Confirmed Codes</span>
+          <span class="results-meta">${confirmed.length} code${confirmed.length !== 1 ? 's' : ''} found</span>
         </div>
         <div class="chips-row">${chips}</div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Type</th><th>Code</th><th>Description</th><th>Reasoning</th>
+                <th>Type</th>
+                <th>Code</th>
+                <th>Description</th>
+                <th>Clinical Reasoning</th>
+                <th>Documentation</th>
+                <th>Confidence</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
-        </div>`;
+        </div>
+        ${suggestedHtml}`;
     }
 
     // Cmd/Ctrl+Enter to submit
