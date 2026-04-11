@@ -661,6 +661,137 @@
     }
     footer nav a:hover { color: var(--teal); }
 
+
+    /* ── DEMO: label sub ── */
+    .label-sub {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-light);
+      text-transform: none;
+      letter-spacing: 0;
+      margin-left: 0.4rem;
+    }
+
+    /* ── DEMO: confirmed code chips (upgraded) ── */
+    .code-chip {
+      display: flex;
+      flex-direction: column;
+      gap: 0.18rem;
+      background: var(--navy);
+      color: var(--white);
+      font-size: 0.83rem;
+      font-weight: 600;
+      padding: 0.5rem 0.9rem;
+      border-radius: 9px;
+      opacity: 0;
+      transform: translateY(8px) scale(0.95);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      min-width: 90px;
+    }
+    .code-chip.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .chip-top {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .chip-type {
+      font-size: 0.62rem;
+      color: var(--teal);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .chip-meta {
+      display: flex;
+      gap: 0.3rem;
+      margin-top: 0.1rem;
+      flex-wrap: wrap;
+    }
+    .chip-badge {
+      font-size: 0.58rem;
+      font-weight: 700;
+      padding: 0.1rem 0.38rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .chip-badge.priority-primary   { background: rgba(0,194,168,0.22); color: var(--teal); }
+    .chip-badge.priority-secondary { background: rgba(59,130,246,0.18); color: #3b82f6; }
+    .chip-badge.priority-procedural{ background: rgba(245,158,11,0.18); color: #d97706; }
+    .chip-badge.priority-supplemental{ background: rgba(148,163,184,0.2); color: #94a3b8; }
+    .chip-badge.doc-strong  { background: rgba(16,185,129,0.15); color: #10b981; }
+    .chip-badge.doc-moderate{ background: rgba(245,158,11,0.15); color: #d97706; }
+    .chip-badge.doc-weak    { background: rgba(239,68,68,0.15);  color: #ef4444; }
+    .chip-conf {
+      font-size: 0.6rem;
+      color: rgba(255,255,255,0.45);
+      font-weight: 500;
+    }
+
+    /* ── DEMO: suggested codes ── */
+    .suggested-section { }
+    .suggested-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-height: 20px;
+    }
+    .suggested-chip {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.7rem;
+      background: rgba(245,158,11,0.06);
+      border: 1px dashed rgba(245,158,11,0.35);
+      border-radius: 9px;
+      padding: 0.6rem 0.9rem;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .suggested-chip.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .suggested-chip-left {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      min-width: 70px;
+    }
+    .suggested-code {
+      font-size: 0.83rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .suggested-type {
+      font-size: 0.6rem;
+      font-weight: 800;
+      color: #d97706;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .suggested-chip-right {
+      flex: 1;
+    }
+    .suggested-desc {
+      font-size: 0.78rem;
+      color: var(--text-dark);
+      font-weight: 500;
+      margin-bottom: 0.2rem;
+    }
+    .suggested-needed {
+      font-size: 0.72rem;
+      color: var(--text-mid);
+      line-height: 1.45;
+    }
+    .suggested-needed strong {
+      color: #d97706;
+      font-weight: 600;
+    }
+
     /* ── ANIMATIONS ── */
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(22px); }
@@ -743,9 +874,15 @@
             <span class="ai-status-text" id="ai-status-text">Waiting…</span>
           </div>
 
-          <!-- Extracted codes -->
-          <div class="card-label">Extracted Codes</div>
+          <!-- Confirmed codes -->
+          <div class="card-label">Confirmed Codes <span class="label-sub">ready to bill</span></div>
           <div class="codes-row" id="codes-row"></div>
+
+          <!-- Suggested codes -->
+          <div class="suggested-section" id="suggested-section">
+            <div class="card-label" style="margin-top:1.1rem;">Suggested Codes <span class="label-sub">needs clarification</span></div>
+            <div class="suggested-row" id="suggested-row"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -933,82 +1070,103 @@
       {
         label: 'Diabetes & Hypertension',
         note: 'Patient presents with Type 2 diabetes mellitus with diabetic nephropathy. History of essential hypertension. Prescribed metformin and lisinopril. Follow-up in 3 months.',
-        codes: [
-          { type: 'ICD', code: 'E11.65', desc: 'T2DM w/ nephropathy' },
-          { type: 'ICD', code: 'I10',    desc: 'Essential hypertension' },
-          { type: 'CPT', code: '99213',  desc: 'Office visit, est.' },
-          { type: 'CPT', code: '83036',  desc: 'HbA1c test' },
+        confirmed: [
+          { type: 'ICD', code: 'E11.65', desc: 'T2DM w/ nephropathy',     priority: 'primary',    doc: 'strong',   conf: 0.97 },
+          { type: 'ICD', code: 'I10',    desc: 'Essential hypertension',  priority: 'secondary',  doc: 'strong',   conf: 0.95 },
+          { type: 'CPT', code: '99213',  desc: 'Office visit, est.',       priority: 'procedural', doc: 'strong',   conf: 0.92 },
+          { type: 'CPT', code: '83036',  desc: 'HbA1c test',              priority: 'procedural', doc: 'moderate', conf: 0.84 },
+        ],
+        suggested: [
+          { type: 'CPT', code: 'Z68.39', desc: 'BMI 39.0–39.9', needed: 'Document BMI measurement in the note to support coding' },
+          { type: 'CPT', code: '99490',  desc: 'Chronic care management', needed: 'Confirm 20+ mins of care coordination this month' },
         ]
       },
       {
         label: 'Chest Pain Evaluation',
         note: 'Patient is a 58-year-old male presenting with acute chest pain, shortness of breath, and diaphoresis. EKG performed. Troponin ordered. Rule out NSTEMI. Administered aspirin 325 mg.',
-        codes: [
-          { type: 'ICD', code: 'R07.9',  desc: 'Chest pain, unspecified' },
-          { type: 'ICD', code: 'R06.09', desc: 'Dyspnea, other' },
-          { type: 'CPT', code: '93000',  desc: 'EKG with interpretation' },
-          { type: 'CPT', code: '84484',  desc: 'Troponin, quantitative' },
-          { type: 'CPT', code: '99285',  desc: 'ED visit, high severity' },
+        confirmed: [
+          { type: 'ICD', code: 'R07.9',  desc: 'Chest pain, unspecified', priority: 'primary',    doc: 'strong',   conf: 0.95 },
+          { type: 'ICD', code: 'R06.09', desc: 'Dyspnea, other',          priority: 'secondary',  doc: 'strong',   conf: 0.91 },
+          { type: 'CPT', code: '93000',  desc: 'EKG w/ interpretation',   priority: 'procedural', doc: 'strong',   conf: 0.98 },
+          { type: 'CPT', code: '99285',  desc: 'ED visit, high severity', priority: 'procedural', doc: 'strong',   conf: 0.93 },
+        ],
+        suggested: [
+          { type: 'ICD', code: 'I21.4',  desc: 'NSTEMI', needed: 'Confirm NSTEMI diagnosis — currently documented as "rule out" only' },
+          { type: 'CPT', code: '84484',  desc: 'Troponin, quantitative',  needed: 'Confirm troponin was resulted and interpreted, not just ordered' },
         ]
       },
       {
         label: 'Post-Op Knee Replacement',
         note: '72-year-old female, 6 weeks post total knee arthroplasty, right knee. Wound healing well. Reports mild pain controlled with acetaminophen. ROM improving. Continue PT twice weekly.',
-        codes: [
-          { type: 'ICD', code: 'Z96.651', desc: 'R knee joint prosthesis' },
-          { type: 'ICD', code: 'M25.361', desc: 'Stiffness, right knee' },
-          { type: 'CPT', code: '99213',   desc: 'Office visit, est.' },
-          { type: 'CPT', code: '97110',   desc: 'Therapeutic exercises' },
+        confirmed: [
+          { type: 'ICD', code: 'Z96.651', desc: 'R knee joint prosthesis', priority: 'primary',    doc: 'strong',   conf: 0.97 },
+          { type: 'ICD', code: 'M25.361', desc: 'Stiffness, right knee',   priority: 'secondary',  doc: 'moderate', conf: 0.80 },
+          { type: 'CPT', code: '99213',   desc: 'Office visit, est.',       priority: 'procedural', doc: 'strong',   conf: 0.91 },
+          { type: 'CPT', code: '97110',   desc: 'Therapeutic exercises',   priority: 'procedural', doc: 'moderate', conf: 0.78 },
+        ],
+        suggested: [
+          { type: 'ICD', code: 'Z96.641', desc: 'Partial knee prosthesis presence', needed: 'Clarify if partial or total arthroplasty for correct specificity' },
         ]
       },
       {
         label: 'Pediatric Asthma Visit',
         note: 'Patient is an 8-year-old with persistent moderate asthma presenting for follow-up. Using albuterol inhaler 3x/week. No ER visits since last visit. Spirometry performed. Adjusted fluticasone dose.',
-        codes: [
-          { type: 'ICD', code: 'J45.40', desc: 'Moderate persistent asthma' },
-          { type: 'CPT', code: '94010',  desc: 'Spirometry' },
-          { type: 'CPT', code: '99213',  desc: 'Office visit, est.' },
-          { type: 'ICD', code: 'Z79.899', desc: 'Long-term inhaled steroid' },
+        confirmed: [
+          { type: 'ICD', code: 'J45.40',  desc: 'Moderate persistent asthma', priority: 'primary',    doc: 'strong',   conf: 0.96 },
+          { type: 'CPT', code: '94010',   desc: 'Spirometry',                  priority: 'procedural', doc: 'strong',   conf: 0.98 },
+          { type: 'CPT', code: '99213',   desc: 'Office visit, est.',           priority: 'procedural', doc: 'strong',   conf: 0.90 },
+          { type: 'ICD', code: 'Z79.899', desc: 'Long-term inhaled steroid',   priority: 'supplemental', doc: 'strong', conf: 0.88 },
+        ],
+        suggested: [
+          { type: 'CPT', code: '94060', desc: 'Spirometry pre/post bronchodilator', needed: 'Was bronchodilator given before spirometry? Document to support upgraded code' },
+          { type: 'ICD', code: 'Z82.5', desc: 'Family history of asthma',           needed: 'Document family history if applicable for completeness' },
         ]
       },
     ];
 
     let currentScenario = 0;
 
-    const noteEl       = document.getElementById('demo-note');
-    const codesRow     = document.getElementById('codes-row');
-    const progressFill = document.getElementById('progress-fill');
-    const statusText   = document.getElementById('ai-status-text');
-    const scenarioName = document.getElementById('scenario-name');
+    const noteEl        = document.getElementById('demo-note');
+    const codesRow      = document.getElementById('codes-row');
+    const suggestedRow  = document.getElementById('suggested-row');
+    const progressFill  = document.getElementById('progress-fill');
+    const statusText    = document.getElementById('ai-status-text');
+    const scenarioName  = document.getElementById('scenario-name');
 
-    const TYPING_SPEED   = 22;   // ms per character
-    const PAUSE_AFTER    = 600;  // ms after typing done before analysis
-    const ANALYSIS_DURATION = 1600; // ms for progress bar
-    const HOLD_DURATION  = 3200; // ms to display results
-    const RESET_DURATION = 500;  // ms fade-out
+    const TYPING_SPEED       = 22;
+    const PAUSE_AFTER        = 600;
+    const ANALYSIS_DURATION  = 1800;
+    const HOLD_DURATION      = 3800;
+    const RESET_DURATION     = 500;
 
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function priorityClass(p) {
+      return { primary: 'priority-primary', secondary: 'priority-secondary', procedural: 'priority-procedural', supplemental: 'priority-supplemental' }[p] || '';
+    }
+    function docClass(d) {
+      return { strong: 'doc-strong', moderate: 'doc-moderate', weak: 'doc-weak' }[d] || '';
+    }
 
     async function runDemo() {
       while (true) {
         const s = scenarios[currentScenario];
         currentScenario = (currentScenario + 1) % scenarios.length;
 
-        // Reset state
-        codesRow.innerHTML = '';
+        // Reset
+        codesRow.innerHTML    = '';
+        suggestedRow.innerHTML = '';
         progressFill.style.transition = 'none';
         progressFill.style.width = '0%';
         statusText.textContent = 'Waiting…';
         statusText.style.color = 'var(--text-light)';
         scenarioName.textContent = s.label;
 
-        // Step 1: typewriter
+        // Typewriter
         noteEl.innerHTML = '<span class="cursor"></span>';
         const chars = s.note.split('');
         for (let i = 0; i < chars.length; i++) {
           const cursor = noteEl.querySelector('.cursor');
-          // insert char before cursor
-          const text = noteEl.childNodes[0];
           if (noteEl.firstChild && noteEl.firstChild.nodeType === Node.TEXT_NODE) {
             noteEl.firstChild.textContent += chars[i];
           } else {
@@ -1019,21 +1177,49 @@
 
         await sleep(PAUSE_AFTER);
 
-        // Step 2: progress bar
+        // Progress bar
         statusText.textContent = 'Analyzing…';
         statusText.style.color = 'var(--teal)';
         progressFill.style.transition = `width ${ANALYSIS_DURATION}ms cubic-bezier(0.4,0,0.2,1)`;
         progressFill.style.width = '100%';
 
-        // Reveal codes staggered during analysis
-        const chipDelay = ANALYSIS_DURATION / (s.codes.length + 1);
-        s.codes.forEach((c, i) => {
+        // Confirmed code chips
+        const totalItems = s.confirmed.length + s.suggested.length;
+        const chipDelay  = ANALYSIS_DURATION / (totalItems + 1);
+
+        s.confirmed.forEach((c, i) => {
           const chip = document.createElement('div');
           chip.className = 'code-chip';
-          chip.innerHTML = `<span class="chip-type">${c.type}</span>${c.code}`;
+          chip.innerHTML = `
+            <div class="chip-top">
+              <span class="chip-type">${c.type}</span>
+              <span>${c.code}</span>
+            </div>
+            <div class="chip-meta">
+              <span class="chip-badge ${priorityClass(c.priority)}">${c.priority}</span>
+              <span class="chip-badge ${docClass(c.doc)}">${c.doc}</span>
+            </div>
+            <span class="chip-conf">${Math.round(c.conf * 100)}% confidence</span>`;
           chip.title = c.desc;
           codesRow.appendChild(chip);
           setTimeout(() => chip.classList.add('visible'), chipDelay * (i + 1));
+        });
+
+        // Suggested chips (staggered after confirmed)
+        s.suggested.forEach((sg, i) => {
+          const chip = document.createElement('div');
+          chip.className = 'suggested-chip';
+          chip.innerHTML = `
+            <div class="suggested-chip-left">
+              <span class="suggested-type">${sg.type}</span>
+              <span class="suggested-code">${sg.code}</span>
+            </div>
+            <div class="suggested-chip-right">
+              <div class="suggested-desc">${sg.desc}</div>
+              <div class="suggested-needed"><strong>Needs:</strong> ${sg.needed}</div>
+            </div>`;
+          suggestedRow.appendChild(chip);
+          setTimeout(() => chip.classList.add('visible'), chipDelay * (s.confirmed.length + i + 1));
         });
 
         await sleep(ANALYSIS_DURATION);
@@ -1043,14 +1229,13 @@
 
         await sleep(HOLD_DURATION);
 
-        // Step 3: fade out codes and reset
-        codesRow.querySelectorAll('.code-chip').forEach(c => {
+        // Fade out
+        [...codesRow.querySelectorAll('.code-chip'), ...suggestedRow.querySelectorAll('.suggested-chip')].forEach(c => {
           c.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
           c.style.opacity = '0';
           c.style.transform = 'translateY(-6px)';
         });
 
-        // Erase text fast
         progressFill.style.transition = `width ${RESET_DURATION}ms ease`;
         progressFill.style.width = '0%';
 
