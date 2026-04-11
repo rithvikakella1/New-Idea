@@ -1,5 +1,5 @@
 .env
 __pycache__
 .venv
-
 users.json
+tests/benchmark_results.json

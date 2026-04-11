@@ -681,7 +681,7 @@
 
   <!-- NAV -->
   <nav>
-    <a class="nav-logo" href="landing.html">mo<span>BILL</span>ity</a>
+    <a class="nav-logo" href="/">mo<span>BILL</span>ity</a>
     <ul class="nav-links">
       <li><a href="/">Home</a></li>
       <li><a href="/#features">Features</a></li>
@@ -753,7 +753,7 @@
 
   <!-- FOOTER -->
   <footer>
-    <a class="footer-logo" href="landing.html">mo<span>BILL</span>ity</a>
+    <a class="footer-logo" href="/">mo<span>BILL</span>ity</a>
   </footer>
 
   <script>
@@ -786,7 +786,7 @@
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const el = document.getElementById('navUsername');
-        if (el && payload.sub) el.textContent = payload.sub;
+        if (el) el.textContent = payload.full_name || payload.sub;
       } catch {}
     })();
 

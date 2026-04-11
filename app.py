@@ -9,6 +9,8 @@ from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()  # loads .env before any os.getenv() calls
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 from openai import OpenAI
 from fastapi import FastAPI, HTTPException, Depends, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,7 +41,7 @@ else:
     ENCRYPTION_KEY = secrets.token_bytes(32)
 
 # ── USER STORE (file-based) ───────────────────────────────────────────────────
-USERS_FILE = "users.json"
+USERS_FILE = os.path.join(BASE_DIR, "users.json")
 
 def _load_users() -> dict:
     if os.path.exists(USERS_FILE):
@@ -255,28 +257,29 @@ def extract_medical_codes(note: str) -> dict:
 
 
 # ── PAGE ROUTES ───────────────────────────────────────────────────────────────
+def _serve(filename: str) -> str:
+    with open(os.path.join(BASE_DIR, filename), "r", encoding="utf-8") as f:
+        return f.read()
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_landing():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return _serve("index.html")
 
 
 @app.get("/app", response_class=HTMLResponse)
 async def serve_app():
-    with open("app.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return _serve("app.html")
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def serve_login():
-    with open("login.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return _serve("login.html")
 
 
 @app.get("/signup", response_class=HTMLResponse)
 async def serve_signup():
-    with open("signup.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return _serve("signup.html")
 
 
 # ── API ROUTES ────────────────────────────────────────────────────────────────
@@ -294,8 +297,10 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    users = _load_users()
+    full_name = users.get(form_data.username, {}).get("full_name", "") or form_data.username
     token = create_access_token(
-        data={"sub": form_data.username},
+        data={"sub": form_data.username, "full_name": full_name},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     return {"access_token": token, "token_type": "bearer"}

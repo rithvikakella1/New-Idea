@@ -62,7 +62,10 @@
       gap: 2rem;
       list-style: none;
       align-items: center;
+      padding: 0;
+      margin: 0;
     }
+    .nav-links li { list-style: none; }
     .nav-links a {
       text-decoration: none;
       font-size: 0.9rem;
@@ -653,13 +656,21 @@
     .footer-logo span { color: var(--teal); }
 
     footer nav a {
-      color: rgba(255,255,255,0.45);
+      color: var(--teal);
       text-decoration: none;
-      margin-left: 1.5rem;
-      font-size: 0.82rem;
-      transition: color 0.2s;
+      margin-left: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.3rem 0.85rem;
+      border: 1px solid rgba(0,194,168,0.35);
+      border-radius: 50px;
+      transition: color 0.2s, background 0.2s, border-color 0.2s;
     }
-    footer nav a:hover { color: var(--teal); }
+    footer nav a:hover {
+      color: var(--navy);
+      background: var(--teal);
+      border-color: var(--teal);
+    }
 
     /* ── ANIMATIONS ── */
     @keyframes fadeUp {
@@ -696,7 +707,7 @@
       <li><a href="#how">How it works</a></li>
       <li><a href="#features">Features</a></li>
       <li><a href="#compliance">Compliance</a></li>
-      <li><a href="app.html" class="nav-cta">Launch App →</a></li>
+      <li><a href="/login" class="nav-cta">Launch App →</a></li>
     </ul>
   </nav>
 
@@ -707,7 +718,7 @@
     <h1>Medical coding,<br/><em>reimagined</em> with AI.</h1>
     <p>Automatically extract accurate ICD-10 and CPT codes from clinical notes in seconds. Built for clinicians, billers, and healthcare teams.</p>
     <div class="hero-actions">
-      <a href="app.html" class="btn-primary">Launch the App</a>
+      <a href="/login" class="btn-primary">Launch the App</a>
       <a href="#how" class="btn-secondary">See how it works</a>
     </div>
 
@@ -898,7 +909,7 @@
       <span class="section-tag">Get started today</span>
       <h2 class="section-title">Ready to eliminate manual coding?</h2>
       <p class="section-sub">Join healthcare teams already saving hours every week with AI-powered code extraction.</p>
-      <a href="app.html" class="btn-primary">Launch moBILLity →</a>
+      <a href="/login" class="btn-primary">Launch moBILLity →</a>
     </div>
   </section>
 
