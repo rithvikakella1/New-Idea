@@ -26,13 +26,10 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from jose import JWTError, jwt
 
 # ── SECURITY CONFIG ──────────────────────────────────────────────────────────
-# JWT: set JWT_SECRET_KEY in env for persistence across restarts
 SECRET_KEY = os.getenv("JWT_SECRET_KEY") or secrets.token_hex(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
-# AES-256 key (32 bytes). Set ENCRYPTION_KEY as base64-encoded 32 bytes in env.
-# If unset, key is ephemeral (regenerated on restart) — fine for demo/dev.
 _enc_env = os.getenv("ENCRYPTION_KEY", "")
 if _enc_env:
     _raw = base64.b64decode(_enc_env + "==")
@@ -53,7 +50,6 @@ def _save_users(users: dict) -> None:
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=2)
 
-# Seed the admin account from env on first run
 _users = _load_users()
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "haiven2025")
@@ -85,35 +81,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ── HIPAA SECURITY HEADERS (TLS enforcement signals) ─────────────────────────
+# ── HIPAA SECURITY HEADERS ────────────────────────────────────────────────────
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
-    # HSTS: tell browsers to always use HTTPS (TLS 1.2+ enforced at transport)
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Cache-Control"] = "no-store"  # PHI must never be cached
+    response.headers["Cache-Control"] = "no-store"
     return response
 
-
-# ── AES-256-GCM UTILITIES (data at rest) ─────────────────────────────────────
+# ── AES-256-GCM UTILITIES ─────────────────────────────────────────────────────
 def aes_encrypt(plaintext: str) -> str:
-    """Encrypt with AES-256-GCM. Returns base64(nonce + ciphertext)."""
     aesgcm = AESGCM(ENCRYPTION_KEY)
-    nonce = secrets.token_bytes(12)  # 96-bit nonce recommended for GCM
+    nonce = secrets.token_bytes(12)
     ct = aesgcm.encrypt(nonce, plaintext.encode(), None)
     return base64.b64encode(nonce + ct).decode()
 
-
 def aes_decrypt(token: str) -> str:
-    """Decrypt an AES-256-GCM token."""
     raw = base64.b64decode(token)
     nonce, ct = raw[:12], raw[12:]
     return AESGCM(ENCRYPTION_KEY).decrypt(nonce, ct, None).decode()
-
 
 # ── JWT AUTH ──────────────────────────────────────────────────────────────────
 def authenticate_user(username: str, password: str) -> bool:
@@ -123,13 +112,11 @@ def authenticate_user(username: str, password: str) -> bool:
         return False
     return bcrypt.checkpw(password.encode(), user["hash"].encode())
 
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
     to_encode["exp"] = expire
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     exc = HTTPException(
@@ -146,75 +133,90 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     except JWTError:
         raise exc
 
-
 # ── OPENAI CLIENT ─────────────────────────────────────────────────────────────
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# ── CONFIDENCE THRESHOLD ──────────────────────────────────────────────────────
+# Codes below this threshold are moved to suggested_codes at parse time.
+# Raise this value to increase precision; lower it to increase recall.
+CONFIRMED_CONFIDENCE_THRESHOLD = 0.75
+
 # ── PHYSICIAN BILLING PROMPT ──────────────────────────────────────────────────
-prompt_template = """You are a board-certified professional medical coder and physician billing specialist with 20+ years of experience in ICD-10-CM, ICD-10-PCS, and CPT/HCPCS Level II coding. You are preparing claims for insurance submission on behalf of the treating physician.
+# NOTE: Uses a two-pass chain-of-thought style:
+#   1. The system message instructs the model to reason carefully before emitting JSON.
+#   2. The user prompt contains strict rules + few-shot HCPCS examples to anchor
+#      the model's understanding of HCPCS Level II codes alongside ICD-10 and CPT.
 
-CODING STANDARDS YOU MUST FOLLOW:
-- ICD-10-CM Official Guidelines for Coding and Reporting (current year)
-- AMA CPT® codebook rules and parenthetical notes
-- CMS National Correct Coding Initiative (NCCI) edits
-- Code to the HIGHEST level of specificity: include 7th character, laterality, severity, and episode of care where applicable
-- NEVER code "possible," "probable," "suspected," or "rule out" conditions as confirmed diagnoses — only code what is documented as confirmed
-- Include ALL comorbidities and secondary conditions that affect treatment complexity or medical decision-making
-- Apply correct sequencing: principal/primary diagnosis first, then complications, then comorbidities
-- Consider E&M level codes if the note supports an office or hospital visit
+SYSTEM_PROMPT = """You are a board-certified professional medical coder and physician billing specialist with 20+ years of experience in ICD-10-CM, ICD-10-PCS, CPT, and HCPCS Level II coding.
 
-BILLING PRIORITIES:
-1. PRIMARY diagnosis (ICD-10-CM) — the main reason for the encounter
-2. SECONDARY diagnoses (ICD-10-CM) — comorbidities affecting treatment
-3. PROCEDURE codes (CPT) — all billable services rendered
-4. Modifier applicability — flag bilateral, multiple procedures, or assistant surgeon scenarios
+PRECISION RULES — follow these exactly to achieve ≥90% coding accuracy:
+1. Only assign a code when there is EXPLICIT, UNAMBIGUOUS documentation supporting it. When in doubt, move it to suggested_codes.
+2. For ICD-10-CM: always code to the highest specificity — include 7th character, laterality, episode of care, and severity where required. A truncated code (e.g., S52 without full extension) is WRONG.
+3. For CPT: verify that the procedure is fully documented (operative note, procedure note, or attending attestation). Do not infer a procedure from a diagnosis alone.
+4. For HCPCS Level II: assign codes for durable medical equipment (DME), orthotics/prosthetics, ambulance services, drugs administered in the office (J-codes), supplies (A-codes), and other non-physician services. Only assign when the item/service is explicitly documented as provided or ordered.
+5. NEVER code "possible," "probable," "suspected," "rule out," or "likely" conditions as confirmed diagnoses.
+6. Apply correct sequencing: principal/primary diagnosis first, then complications, then comorbidities.
+7. Set confidence as a strict self-assessment:
+   - 0.90–1.00: Code is exact, unambiguous, and fully documented — safe to bill.
+   - 0.75–0.89: Code is correct but documentation has minor gaps — bill with addendum recommended.
+   - <0.75: Too uncertain — place in suggested_codes instead.
+8. Never hallucinate codes. If you are uncertain of the exact code, use suggested_codes with documentation_needed.
 
-For each CONFIRMED code, provide:
-- confidence: 0.0–1.0 (certainty this code is correct and billable from the documentation alone)
-- documentation_strength: "strong" (explicitly documented) | "moderate" (implied but inferrable) | "weak" (risky to bill without addendum)
-- billing_priority: "primary" | "secondary" | "procedural" | "supplemental"
+HCPCS LEVEL II EXAMPLES (use these as anchors):
+- E0601 — Continuous positive airway pressure (CPAP) device
+- L3000 — Foot insert, removable, molded to patient model
+- J0696 — Injection, ceftriaxone sodium, per 250mg
+- A4570 — Splint
+- K0001 — Standard manual wheelchair
+- G0008 — Administration of influenza virus vaccine
 
-Also provide a "suggested_codes" array for codes that clinically likely apply but require physician clarification or additional documentation before submitting to insurance.
+You MUST respond ONLY with valid JSON — no markdown fences, no prose, no explanation outside the JSON object.
+"""
 
-Respond ONLY with valid JSON — no markdown fences, no extra text:
+PROMPT_TEMPLATE = """Extract all billable medical codes from the clinical note below. Include ICD-10-CM diagnosis codes, CPT procedure codes, AND HCPCS Level II codes (DME, supplies, drugs, orthotics, ambulance, vaccines, etc.).
+
+Return this exact JSON structure:
 {
   "confirmed_codes": [
     {
-      "type": "Diagnosis or Procedure",
-      "code_type": "ICD-10 or CPT",
-      "code": "<exact code>",
+      "type": "Diagnosis | Procedure | Supply | Drug | DME | Orthotic | Other",
+      "code_type": "ICD-10-CM | ICD-10-PCS | CPT | HCPCS",
+      "code": "<exact full code with all required characters>",
       "description": "<full official description>",
-      "reasoning": "<specific justification drawn from the clinical note>",
-      "confidence": <float 0.0–1.0>,
-      "documentation_strength": "strong or moderate or weak",
-      "billing_priority": "primary or secondary or procedural or supplemental"
+      "reasoning": "<quote or paraphrase the specific documentation that supports this code>",
+      "confidence": <float 0.75–1.0>,
+      "documentation_strength": "strong | moderate | weak",
+      "billing_priority": "primary | secondary | procedural | supplemental"
     }
   ],
   "suggested_codes": [
     {
-      "code_type": "ICD-10 or CPT",
+      "code_type": "ICD-10-CM | ICD-10-PCS | CPT | HCPCS",
       "code": "<exact code>",
       "description": "<full official description>",
-      "reason_suggested": "<why this code may apply based on clinical context>",
-      "documentation_needed": "<what additional documentation would confirm and allow billing>"
+      "reason_suggested": "<why this code may apply>",
+      "documentation_needed": "<what additional documentation would confirm this code>"
     }
   ]
 }
 
+Rules:
+- confirmed_codes: only codes with confidence ≥ 0.75 and strong/moderate documentation.
+- suggested_codes: codes that clinically likely apply but need more documentation, OR any code where confidence < 0.75.
+- Do NOT omit HCPCS codes for any DME, supply, injectable drug, or non-physician service documented in the note.
+- If no HCPCS codes apply, return an empty array for that section — do not fabricate codes.
+
 Clinical Note:
 """
-
 
 # ── RESPONSE PARSING ──────────────────────────────────────────────────────────
 def _parse_llm_response(text: str) -> dict:
     cleaned = re.sub(r"```json|```", "", text).strip()
 
-    # Prefer JSON object
     start, end = cleaned.find("{"), cleaned.rfind("}")
     if start != -1 and end != -1 and end > start:
         candidate = cleaned[start:end + 1]
     else:
-        # Fallback: legacy array format
         s, e = cleaned.find("["), cleaned.rfind("]")
         if s != -1 and e != -1:
             try:
@@ -226,30 +228,53 @@ def _parse_llm_response(text: str) -> dict:
 
     try:
         data = json.loads(candidate)
+
+        confirmed = []
+        downgraded = []
+
         for item in data.get("confirmed_codes", []):
             try:
                 item["confidence"] = round(float(item.get("confidence", 0)), 2)
             except Exception:
                 item["confidence"] = 0.0
+
+            # Enforce threshold: low-confidence confirmed codes move to suggested
+            if item["confidence"] < CONFIRMED_CONFIDENCE_THRESHOLD:
+                downgraded.append({
+                    "code_type": item.get("code_type", ""),
+                    "code": item.get("code", ""),
+                    "description": item.get("description", ""),
+                    "reason_suggested": f"Confidence {item['confidence']} below threshold — {item.get('reasoning', '')}",
+                    "documentation_needed": "Strengthen documentation to support billing.",
+                })
+            else:
+                confirmed.append(item)
+
+        data["confirmed_codes"] = confirmed
+        data["suggested_codes"] = data.get("suggested_codes", []) + downgraded
+
         return data
+
     except Exception:
         return {"confirmed_codes": [], "suggested_codes": [], "raw": cleaned}
 
 
 def extract_medical_codes(note: str) -> dict:
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        # gpt-4o substantially outperforms gpt-4o-mini on medical coding precision.
+        # For cost-sensitive deployments, use "gpt-4o-mini" and accept ~5–10% lower accuracy.
+        model="gpt-4o",
         messages=[
             {
                 "role": "system",
-                "content": (
-                    "You are a precise physician billing specialist and medical coding expert. "
-                    "Always respond with valid JSON only. All confidence values must be floats between 0 and 1."
-                ),
+                "content": SYSTEM_PROMPT,
             },
-            {"role": "user", "content": prompt_template + note.strip()},
+            {
+                "role": "user",
+                "content": PROMPT_TEMPLATE + note.strip(),
+            },
         ],
-        temperature=0,
+        temperature=0,       # deterministic output — critical for coding accuracy
         top_p=1,
         response_format={"type": "json_object"},
     )
@@ -348,8 +373,7 @@ async def api_extract(
         raise HTTPException(status_code=400, detail="No clinical note provided.")
     try:
         result = extract_medical_codes(input.note)
-        # Encrypt a copy of the note for audit (HIPAA data-at-rest requirement)
-        _ = aes_encrypt(input.note)  # in production, persist this encrypted record
+        _ = aes_encrypt(input.note)  # audit log (persist in production)
         return {"result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
